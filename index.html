@@ -403,11 +403,6 @@ html, body {
 </head>
 <body>
 <div class="header">
-    <div>
-        <h1>🌳 公开任务树形图谱</h1>
-        <div class="subtitle">点击节点查看详情 · 点击 +/− 展开子节点 · 拖拽移动 · 滚轮缩放</div>
-    </div>
-    <div class="stats" id="stats-bar"></div>
     <div class="search-box" id="search-box">
         <div class="search-field">
             <input type="text" class="search-input" id="search-input" placeholder="🔍 搜索任务/创建人/负责人..." oninput="onSearch(this.value)" onkeydown="onSearchKey(event)">
@@ -420,6 +415,11 @@ html, body {
         </div>
         <div class="search-results" id="search-results"></div>
     </div>
+    <div>
+        <h1>🌳 公开任务树形图谱</h1>
+        <div class="subtitle">点击节点查看详情 · 点击 +/− 展开子节点 · 拖拽移动 · 滚轮缩放</div>
+    </div>
+    <div class="stats" id="stats-bar"></div>
     <div class="legend-bar">
         <span class="legend-item"><span class="legend-dot" style="background:#ff6b6b"></span>总项目</span>
         <span class="legend-item"><span class="legend-dot" style="background:#4ecdc4"></span>一级模块</span>
