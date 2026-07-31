@@ -505,7 +505,7 @@ function renderGroupNode(node) {
     node.tasks.forEach(task => {
         const progressClass = getProgressClass(task.progress);
         const clickHandler = task.private ? '' : 'onclick="showDetail(' + task.id + ')"';
-        html += '<div class="group-item' + (task.private ? ' private' : '') + '" ' + clickHandler + '>';
+        html += '<div class="group-item' + (task.private ? ' private' : '') + '" id="group-item-' + task.id + '" ' + clickHandler + '>';
         html += '<span class="group-item-title">' + (task.ext ? '⭐ ' : '') + task.title + '</span>';
         html += '<span class="progress-pill ' + progressClass + '">' + getProgressLabel(task.progress) + '</span>';
         html += '</div>';
@@ -613,13 +613,19 @@ function findNode(root, id) {
 }
 
 // ==================== 搜索功能 ====================
-function flattenTasks(node, list) {
+function flattenTasks(node, list, path) {
+    path = path || [];
     if (node.group) {
-        (node.tasks || []).forEach(t => flattenTasks(t, list));
+        (node.tasks || []).forEach(t => { t._path = path.slice(); flattenTasks(t, list, path.slice()); });
         return list;
     }
+    if (node.id === 0) {
+        (node.children || []).forEach(c => flattenTasks(c, list, [node.id]));
+        return list;
+    }
+    node._path = path;
     list.push(node);
-    if (node.children) node.children.forEach(c => flattenTasks(c, list));
+    if (node.children) node.children.forEach(c => flattenTasks(c, list, path.concat([node.id])));
     return list;
 }
 const allTasks = flattenTasks(taskData, []);
@@ -648,7 +654,7 @@ function onSearch(keyword) {
         const creator = (t.creator || '').toLowerCase();
         const assignees = (t.assignees || '').toLowerCase();
         return title.includes(keyword) || desc.includes(keyword) || creator.includes(keyword) || assignees.includes(keyword) || String(t.id).includes(keyword);
-    }).slice(0, 30);
+    });
 
     currentMatchIndex = searchMatches.length > 0 ? 0 : -1;
     renderSearchResults();
@@ -676,10 +682,40 @@ function renderSearchResults() {
     resultsBox.classList.add('show');
 }
 
+function revealAndCenter(id) {
+    const node = findNode(taskData, id);
+    if (!node) return;
+    (node._path || []).forEach(pid => {
+        const wrap = document.getElementById('children-' + pid);
+        const btn = document.getElementById('btn-' + pid);
+        if (wrap && wrap.classList.contains('collapsed')) {
+            wrap.classList.remove('collapsed');
+            if (btn) { btn.classList.remove('collapsed'); btn.classList.add('expanded'); }
+        }
+    });
+    setTimeout(() => {
+        drawLines();
+        const el = document.getElementById('group-item-' + id) || document.getElementById('node-' + id);
+        if (el) centerOnElement(el);
+    }, 60);
+}
+
+function centerOnElement(el) {
+    const wrapper = document.getElementById('canvas-wrapper');
+    const wRect = wrapper.getBoundingClientRect();
+    const eRect = el.getBoundingClientRect();
+    const dx = (wRect.left + wRect.width / 2) - (eRect.left + eRect.width / 2);
+    const dy = (wRect.top + wRect.height / 2) - (eRect.top + eRect.height / 2);
+    panX += dx / scale;
+    panY += dy / scale;
+    updateTransform();
+}
+
 function searchPrev() {
     if (searchMatches.length === 0) return;
     currentMatchIndex = (currentMatchIndex - 1 + searchMatches.length) % searchMatches.length;
     showDetail(searchMatches[currentMatchIndex].id);
+    revealAndCenter(searchMatches[currentMatchIndex].id);
     renderSearchResults();
     updateSearchNav();
 }
@@ -688,6 +724,7 @@ function searchNext() {
     if (searchMatches.length === 0) return;
     currentMatchIndex = (currentMatchIndex + 1) % searchMatches.length;
     showDetail(searchMatches[currentMatchIndex].id);
+    revealAndCenter(searchMatches[currentMatchIndex].id);
     renderSearchResults();
     updateSearchNav();
 }
@@ -705,6 +742,7 @@ function searchResultClick(id) {
     const idx = searchMatches.findIndex(t => t.id === id);
     if (idx !== -1) currentMatchIndex = idx;
     showDetail(id);
+    revealAndCenter(id);
     renderSearchResults();
     updateSearchNav();
 }
