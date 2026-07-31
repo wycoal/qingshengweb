@@ -230,6 +230,18 @@ html, body {
 .group-item-title { color: #1e293b; font-weight: 600; }
 .group-count { background: #ede9fe; color: #6d28d9; padding: 1px 5px; border-radius: 8px; font-size: 8px; font-weight: 600; }
 
+/* 搜索结果定位高亮（边缘发光） */
+.highlight-ring {
+    position: relative;
+    animation: ringFlash 1.6s ease-out infinite;
+    border-radius: 6px;
+    z-index: 5;
+}
+@keyframes ringFlash {
+    0%, 100% { box-shadow: 0 0 0 2px #7c3aed, 0 0 8px 2px rgba(124,58,237,0.55); }
+    50% { box-shadow: 0 0 0 3px #a78bfa, 0 0 16px 5px rgba(167,139,250,0.75); }
+}
+
 .node-title {
     font-size: 9.5px;
     font-weight: 600;
@@ -682,9 +694,19 @@ function renderSearchResults() {
     resultsBox.classList.add('show');
 }
 
+let lastHighlightEl = null;
+
+function clearHighlight() {
+    if (lastHighlightEl) {
+        lastHighlightEl.classList.remove('highlight-ring');
+        lastHighlightEl = null;
+    }
+}
+
 function revealAndCenter(id) {
     const node = findNode(taskData, id);
     if (!node) return;
+    clearHighlight();
     (node._path || []).forEach(pid => {
         const wrap = document.getElementById('children-' + pid);
         const btn = document.getElementById('btn-' + pid);
@@ -696,7 +718,11 @@ function revealAndCenter(id) {
     setTimeout(() => {
         drawLines();
         const el = document.getElementById('group-item-' + id) || document.getElementById('node-' + id);
-        if (el) centerOnElement(el);
+        if (el) {
+            centerOnElement(el);
+            el.classList.add('highlight-ring');
+            lastHighlightEl = el;
+        }
     }, 60);
 }
 
