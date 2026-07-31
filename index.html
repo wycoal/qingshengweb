@@ -38,7 +38,8 @@ html, body {
 .legend-dot { width: 6px; height: 6px; border-radius: 2px; }
 
 /* 搜索框 */
-.search-box { position: relative; }
+.search-box { position: relative; display: flex; align-items: center; gap: 4px; }
+.search-field { position: relative; }
 .search-input {
     width: 180px;
     height: 28px;
@@ -75,6 +76,24 @@ html, body {
     padding: 0;
 }
 .search-clear.show { display: flex; }
+.search-nav { display: flex; align-items: center; gap: 2px; }
+.search-nav-btn {
+    width: 22px; height: 28px;
+    border-radius: 6px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    cursor: pointer;
+    font-size: 10px;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    padding: 0;
+}
+.search-nav-btn:hover:not(:disabled) { background: #f5f3ff; color: #6d28d9; border-color: #a78bfa; }
+.search-nav-btn:disabled { opacity: 0.4; cursor: default; }
+.search-counter { font-size: 9px; color: #94a3b8; min-width: 30px; text-align: center; }
 .search-results {
     position: absolute;
     top: 34px; left: 0;
@@ -97,6 +116,7 @@ html, body {
 }
 .search-result-item:last-child { border-bottom: none; }
 .search-result-item:hover { background: #f5f3ff; }
+.search-result-item.current { background: #ede9fe; border-left: 2px solid #7c3aed; }
 .search-result-item .sr-title {
     font-size: 11px;
     font-weight: 600;
@@ -389,8 +409,15 @@ html, body {
     </div>
     <div class="stats" id="stats-bar"></div>
     <div class="search-box" id="search-box">
-        <input type="text" class="search-input" id="search-input" placeholder="🔍 搜索任务/创建人/负责人..." oninput="onSearch(this.value)" onkeydown="onSearchKey(event)">
-        <button class="search-clear" id="search-clear" onclick="clearSearch()" title="清空">×</button>
+        <div class="search-field">
+            <input type="text" class="search-input" id="search-input" placeholder="🔍 搜索任务/创建人/负责人..." oninput="onSearch(this.value)" onkeydown="onSearchKey(event)">
+            <button class="search-clear" id="search-clear" onclick="clearSearch()" title="清空">×</button>
+        </div>
+        <div class="search-nav">
+            <button class="search-nav-btn" id="search-prev" onclick="searchPrev()" title="上一个结果">◀</button>
+            <span class="search-counter" id="search-counter">0/0</span>
+            <button class="search-nav-btn" id="search-next" onclick="searchNext()" title="下一个结果">▶</button>
+        </div>
         <div class="search-results" id="search-results"></div>
     </div>
     <div class="legend-bar">
@@ -597,6 +624,9 @@ function flattenTasks(node, list) {
 }
 const allTasks = flattenTasks(taskData, []);
 
+let searchMatches = [];
+let currentMatchIndex = -1;
+
 function onSearch(keyword) {
     keyword = (keyword || '').trim().toLowerCase();
     const resultsBox = document.getElementById('search-results');
@@ -604,12 +634,15 @@ function onSearch(keyword) {
     clearBtn.classList.toggle('show', keyword.length > 0);
 
     if (!keyword) {
+        searchMatches = [];
+        currentMatchIndex = -1;
+        updateSearchNav();
         resultsBox.classList.remove('show');
         resultsBox.innerHTML = '';
         return;
     }
 
-    const matches = allTasks.filter(t => {
+    searchMatches = allTasks.filter(t => {
         const title = (t.title || '').toLowerCase();
         const desc = (t.description || '').toLowerCase();
         const creator = (t.creator || '').toLowerCase();
@@ -617,12 +650,19 @@ function onSearch(keyword) {
         return title.includes(keyword) || desc.includes(keyword) || creator.includes(keyword) || assignees.includes(keyword) || String(t.id).includes(keyword);
     }).slice(0, 30);
 
-    if (matches.length === 0) {
+    currentMatchIndex = searchMatches.length > 0 ? 0 : -1;
+    renderSearchResults();
+    updateSearchNav();
+}
+
+function renderSearchResults() {
+    const resultsBox = document.getElementById('search-results');
+    if (searchMatches.length === 0) {
         resultsBox.innerHTML = '<div class="search-empty">未找到匹配的结果</div>';
     } else {
-        resultsBox.innerHTML = matches.map(t => {
+        resultsBox.innerHTML = searchMatches.map((t, i) => {
             const progressClass = getProgressClass(t.progress);
-            return '<div class="search-result-item" onclick="searchResultClick(' + t.id + ')">' +
+            return '<div class="search-result-item' + (i === currentMatchIndex ? ' current' : '') + '" onclick="searchResultClick(' + t.id + ')">' +
                 '<div class="sr-title">' + (t.ext ? '⭐ ' : '') + t.title + '</div>' +
                 '<div class="sr-meta">' +
                 '<span>ID: <b>' + t.id + '</b></span>' +
@@ -630,14 +670,46 @@ function onSearch(keyword) {
                 '<span class="progress-pill ' + progressClass + '">' + getProgressLabel(t.progress) + '</span>' +
                 '</div></div>';
         }).join('');
+        const items = resultsBox.querySelectorAll('.search-result-item');
+        if (items[currentMatchIndex]) items[currentMatchIndex].scrollIntoView({ block: 'nearest' });
     }
     resultsBox.classList.add('show');
 }
 
-function searchResultClick(id) {
-    showDetail(id);
-    closeSearch();
+function searchPrev() {
+    if (searchMatches.length === 0) return;
+    currentMatchIndex = (currentMatchIndex - 1 + searchMatches.length) % searchMatches.length;
+    showDetail(searchMatches[currentMatchIndex].id);
+    renderSearchResults();
+    updateSearchNav();
 }
+
+function searchNext() {
+    if (searchMatches.length === 0) return;
+    currentMatchIndex = (currentMatchIndex + 1) % searchMatches.length;
+    showDetail(searchMatches[currentMatchIndex].id);
+    renderSearchResults();
+    updateSearchNav();
+}
+
+function updateSearchNav() {
+    const counter = document.getElementById('search-counter');
+    const prev = document.getElementById('search-prev');
+    const next = document.getElementById('search-next');
+    if (counter) counter.textContent = searchMatches.length === 0 ? '0/0' : (currentMatchIndex + 1) + '/' + searchMatches.length;
+    if (prev) prev.disabled = searchMatches.length === 0;
+    if (next) next.disabled = searchMatches.length === 0;
+}
+
+function searchResultClick(id) {
+    const idx = searchMatches.findIndex(t => t.id === id);
+    if (idx !== -1) currentMatchIndex = idx;
+    showDetail(id);
+    renderSearchResults();
+    updateSearchNav();
+}
+
+updateSearchNav();
 
 function closeSearch() {
     document.getElementById('search-results').classList.remove('show');
